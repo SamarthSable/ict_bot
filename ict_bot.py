@@ -160,13 +160,64 @@
 #         time.sleep(10)  # poll every 10 sec
 
 
-# ict_bot.py (webhook version)
+# # ict_bot.py (webhook version)
+# from flask import Flask, request, jsonify
+# import requests
+
+
+# BOT_TOKEN = "8565181976:AAEkmidgHitCp0ZQBAkI1TFGenrIEZf_-nA"
+# CHAT_ID = "5756718752"
+# URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+# def send(msg):
+#     requests.post(URL, json={"chat_id": CHAT_ID, "text": msg})
+
+# app = Flask(__name__)
+
+# # Last 2 candles memory
+# @app.route("/webhook", methods=["POST"])
+# def webhook():
+#     data = request.json
+#     symbol = data.get("symbol")
+#     timeframe = data.get("timeframe")
+#     low = data.get("low")
+#     high = data.get("high")
+#     close = data.get("close")
+
+#     if not hasattr(webhook, "candles"):
+#         webhook.candles = []
+#     webhook.candles.append([low, high, close])
+#     if len(webhook.candles) > 2:
+#         webhook.candles = webhook.candles[-2:]
+
+#     smooth_low = webhook.candles[-2][0] == webhook.candles[-1][0]
+#     smooth_high = webhook.candles[-2][1] == webhook.candles[-1][1]
+
+#     message = f"🧠 ICT OBSERVATION (M5)\nMarket: {symbol}\nTimeframe: {timeframe}\n\n"
+#     if smooth_low:
+#         message += "• Smooth low detected ✅\n• Liquidity likely resting below\n"
+#     if smooth_high:
+#         message += "• Smooth high detected ✅\n• Liquidity likely resting above\n"
+#     if not smooth_low and not smooth_high:
+#         message += "• No smooth highs/lows detected\n"
+#     message += "Observation only — manual validation"
+
+#     send(message)
+#     return jsonify({"status": "ok"})
+
+# if __name__ == "__main__":
+#     send("✅ ICT Learning Bot Phase 2 (real NIFTY) running.")
+#     app.run(port=5000)
+
+
 from flask import Flask, request, jsonify
 import requests
+import os
 
+# Use environment variables (Railway Variables)
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
-BOT_TOKEN = "8565181976:AAEkmidgHitCp0ZQBAkI1TFGenrIEZf_-nA"
-CHAT_ID = "5756718752"
 URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
 def send(msg):
@@ -174,10 +225,16 @@ def send(msg):
 
 app = Flask(__name__)
 
+# ✅ ROOT ROUTE (THIS FIXES "Not Found")
+@app.route("/", methods=["GET"])
+def root():
+    return jsonify({"status": "server running"})
+
 # Last 2 candles memory
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    data = request.json
+    data = request.json or {}
+
     symbol = data.get("symbol")
     timeframe = data.get("timeframe")
     low = data.get("low")
@@ -186,27 +243,33 @@ def webhook():
 
     if not hasattr(webhook, "candles"):
         webhook.candles = []
+
     webhook.candles.append([low, high, close])
     if len(webhook.candles) > 2:
         webhook.candles = webhook.candles[-2:]
 
+    if len(webhook.candles) < 2:
+        return jsonify({"status": "waiting for more candles"})
+
     smooth_low = webhook.candles[-2][0] == webhook.candles[-1][0]
     smooth_high = webhook.candles[-2][1] == webhook.candles[-1][1]
 
-    message = f"🧠 ICT OBSERVATION (M5)\nMarket: {symbol}\nTimeframe: {timeframe}\n\n"
+    message = (
+        f"🧠 ICT OBSERVATION (M5)\n"
+        f"Market: {symbol}\n"
+        f"Timeframe: {timeframe}\n\n"
+    )
+
     if smooth_low:
         message += "• Smooth low detected ✅\n• Liquidity likely resting below\n"
     if smooth_high:
         message += "• Smooth high detected ✅\n• Liquidity likely resting above\n"
     if not smooth_low and not smooth_high:
         message += "• No smooth highs/lows detected\n"
-    message += "Observation only — manual validation"
+
+    message += "\nObservation only — manual validation"
 
     send(message)
     return jsonify({"status": "ok"})
 
-if __name__ == "__main__":
-    send("✅ ICT Learning Bot Phase 2 (real NIFTY) running.")
-    app.run(port=5000)
-
-
+# ❌ DO NOT USE app.run() ON RAILWAY
